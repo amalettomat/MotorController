@@ -30,7 +30,6 @@ double speedOutput = 0;
 double kp_speed = 0.15;
 double ki_speed= 1.0;
 double kd_speed = 0.0;
-double targetSpeed = 0;
 
 // position control
 double setPosition = 0;
@@ -103,7 +102,7 @@ void home() {
 	controllerData.clearFlag(STATUS_MOVING);
 	controllerData.setFlag(STATUS_RUNNING);
 	controllerData.setFlag(STATUS_HOMING);
-	targetSpeed = homingSpeed;
+	setSpeedValue = homingSpeed;
 }
 
 void setPosTunings( double kp, double ki, double kd ) {
@@ -136,9 +135,9 @@ void setMaxOutput(double maxOut) {
 }
 
 void runAtSpeed(double speed) {
-	targetSpeed = speed;
+	setSpeedValue = speed;
 	Serial.print("run at speed: ");
-	Serial.println(targetSpeed);
+	Serial.println(setSpeedValue);
 	controllerData.setFlag(STATUS_RUNNING);
 	controllerData.clearFlag(STATUS_MOVING);
 	controllerData.clearFlag(STATUS_HOMING);
@@ -334,7 +333,7 @@ void loop()
 	if( controllerData.isHoming() ) {
 		if( !digitalRead(PIN_ENDSWITCH) ) { // LOW: end switch reached
 			stop();
-			targetSpeed = 0.0;
+			setSpeedValue = 0.0;
 			setMotorPwm(0.0);
 			controllerData.position = 0;
 			homed = true;
@@ -353,9 +352,12 @@ void loop()
 		lastPosition = controllerData.position;
 
 		if( controllerData.isRunning() ) {
-			setSpeedValue = targetSpeed;
+			// IN-params:
+			//   controllerData.speed
+			//   setSpeedValue
+			// OUT-param:
+			//   speedOutput
 			speedController.Compute();
-			// lastSpeed = controllerData.speed;
 
 			outVal = setSpeedValue / 8.0;
 			if( outVal < -5 )
