@@ -17,6 +17,9 @@ const int PIN_POT = A0;
 #define INTERVAL 100 // ms
 
 unsigned long lastTime;
+unsigned long lastTrigger = 0;
+long lastTriggerInterval = 0;
+bool lowSpeedMode = true;
 
 double maxOutput = 150;
 
@@ -61,9 +64,12 @@ bool homed = false;
 void encoderSignal() {
 	if( digitalRead(PIN_ENCODER_B) ) {
 		controllerData.position++;
+		lastTriggerInterval = millis() - lastTrigger;
 	} else {
 		controllerData.position--;
+		lastTriggerInterval = - long(millis() - lastTrigger);
 	}
+	lastTrigger = millis();
 }
 
 /**
@@ -240,6 +246,8 @@ void serialReceive() {
 				setPosTunings( kp_pos, ki_pos, atof(serialReceiveBuffer+2));
 			} else if( strncmp(serialReceiveBuffer, "hm", 2) == 0 ) {
 				home();
+			} else if( strncmp(serialReceiveBuffer, "hs", 2) == 0 ) {
+				homingSpeed = atof(serialReceiveBuffer+2);
 			} else if( strncmp(serialReceiveBuffer, "m", 1) == 0 ) {
 				moveToPos( atof(serialReceiveBuffer+1) );
 			} else if( serialReceiveBuffer[0] == 'r' ) {
@@ -257,6 +265,25 @@ void serialReceive() {
 		}
 
 		ch = Serial.read();
+	}
+}
+
+void calcSpeed(unsigned long timeChange) {
+	if( lowSpeedMode ) {
+		if( lastTriggerInterval == 0 )
+			controllerData.speed = 0;
+		else
+			controllerData.speed = 1000.0 / lastTriggerInterval;
+
+		lastTriggerInterval = 0;
+
+		if( controllerData.speed > 100.0 )
+			lowSpeedMode = false;
+	} else {
+		controllerData.speed = (controllerData.position - lastPosition) * 1000.0 / timeChange;
+
+		if( controllerData.speed < 70.0 )
+			lowSpeedMode = true;
 	}
 }
 
@@ -320,8 +347,9 @@ void loop()
 	{
 		lastTime = now;
 
+		calcSpeed(timeChange);
+
 		double outVal = 0.0;
-		controllerData.speed = (controllerData.position - lastPosition) * 1000.0 / timeChange;
 		lastPosition = controllerData.position;
 
 		if( controllerData.isRunning() ) {
@@ -342,12 +370,14 @@ void loop()
 
 			if( dumpValuesSerial ) {
 				Serial.print(controllerData.speed);
-				Serial.print("  ");
+				Serial.print("  O:");
 				Serial.print(speedOutput);
-				Serial.print("  ");
+				Serial.print("  Ov");
 				Serial.print(outVal);
-				Serial.print("  ");
+				Serial.print("  Set:");
 				Serial.print(setSpeedValue);
+				Serial.print("  LSM:");
+				Serial.print(lowSpeedMode);
 				Serial.println();
 			}
 		} else if ( controllerData.isMoving() ) {
