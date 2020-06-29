@@ -14,7 +14,7 @@
 const int PIN_POT = A0;
 #define PIN_ENDSWITCH 4
 
-#define INTERVAL 100 // ms
+#define INTERVAL 50 // ms
 
 unsigned long lastTime;
 unsigned long lastTrigger = 0;
