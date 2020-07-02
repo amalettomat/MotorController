@@ -21,14 +21,14 @@ unsigned long lastTrigger = 0;
 long lastTriggerInterval = 0;
 bool lowSpeedMode = true;
 
-double maxOutput = 1400;
+double maxOutput = 1200;
 
 // speed control
 double setSpeedValue = 0;
 double speedOutput = 0;
 double outVal;
 double kp_speed = 0.15;
-double ki_speed= 0.0;
+double ki_speed= 0.7;
 double kd_speed = 0.0;
 
 // position control
@@ -36,12 +36,12 @@ double setPosition = 0;
 // double position = 0;
 double lastPosition = 0;
 double posOutput = 0;
-double kp_pos = 7.0;
+double kp_pos = 4.0;
 double ki_pos = 0.0;
-double kd_pos = 0.0;
+double kd_pos = 0.1;
 
 // homing
-double homingSpeed = -400.0;
+double homingSpeed = -500.0;
 
 struct ControllerData controllerData;
 
@@ -102,7 +102,6 @@ void home() {
 	controllerData.setFlag(STATUS_MOVING);
 	controllerData.setFlag(STATUS_RUNNING);
 	controllerData.setFlag(STATUS_HOMING);
-	setSpeedValue = homingSpeed;
 	setPosition = -2400.0;
 }
 
@@ -374,7 +373,7 @@ void loop()
 		if ( controllerData.isMoving() ) {
 			posController.Compute();
 
-			if( abs(setPosition-controllerData.position) < 2 && abs(controllerData.speed) < 10.0 ) {
+			if( abs(setPosition-controllerData.position) < 3 && abs(controllerData.speed) < 10.0 ) {
 				posOutput = 0;
 				controllerData.clearFlag(STATUS_MOVING);
 				if( dumpValuesSerial ) {
