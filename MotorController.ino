@@ -14,21 +14,21 @@
 const int PIN_POT = A0;
 #define PIN_ENDSWITCH 4
 
-#define INTERVAL 50 // ms
+#define INTERVAL 10 // ms
 
 unsigned long lastTime;
 unsigned long lastTrigger = 0;
 long lastTriggerInterval = 0;
 bool lowSpeedMode = true;
 
-double maxOutput = 150;
+double maxOutput = 1400;
 
 // speed control
 double setSpeedValue = 0;
-// double lastSpeed = 0;
 double speedOutput = 0;
+double outVal;
 double kp_speed = 0.15;
-double ki_speed= 1.0;
+double ki_speed= 0.0;
 double kd_speed = 0.0;
 
 // position control
@@ -36,8 +36,8 @@ double setPosition = 0;
 // double position = 0;
 double lastPosition = 0;
 double posOutput = 0;
-double kp_pos = 2.0;
-double ki_pos = 2.0;
+double kp_pos = 7.0;
+double ki_pos = 0.0;
 double kd_pos = 0.0;
 
 // homing
@@ -99,10 +99,11 @@ void stop() {
 
 void home() {
 	Serial.println("start homing");
-	controllerData.clearFlag(STATUS_MOVING);
+	controllerData.setFlag(STATUS_MOVING);
 	controllerData.setFlag(STATUS_RUNNING);
 	controllerData.setFlag(STATUS_HOMING);
 	setSpeedValue = homingSpeed;
+	setPosition = -2400.0;
 }
 
 void setPosTunings( double kp, double ki, double kd ) {
@@ -128,7 +129,7 @@ void setSpeedTunings( double kp, double ki, double kd ) {
 }
 
 void setMaxOutput(double maxOut) {
-	maxOutput = constrain(maxOut, 50.0, 255.0);
+	maxOutput = constrain(maxOut, 50.0, 1400.0);
 	Serial.print("set max output: ");
 	Serial.println(maxOutput);
 	posController.SetOutputLimits(-maxOutput, maxOutput);
@@ -276,12 +277,12 @@ void calcSpeed(unsigned long timeChange) {
 
 		lastTriggerInterval = 0;
 
-		if( controllerData.speed > 100.0 )
+		if( abs(controllerData.speed) > 100.0 )
 			lowSpeedMode = false;
 	} else {
 		controllerData.speed = (controllerData.position - lastPosition) * 1000.0 / timeChange;
 
-		if( controllerData.speed < 70.0 )
+		if( abs(controllerData.speed) < 70.0 )
 			lowSpeedMode = true;
 	}
 }
@@ -312,7 +313,7 @@ void setup()
 	attachInterrupt(digitalPinToInterrupt(PIN_ENCODER_A), encoderSignal, RISING);
 
 	speedController.SetSampleTime(INTERVAL);
-	speedController.SetOutputLimits(-50.0, 50.0);
+	speedController.SetOutputLimits(-100.0, 100.0);
 	speedController.SetMode(AUTOMATIC);
 	setSpeedValue = 0.0;
 
@@ -322,6 +323,28 @@ void setup()
 
 	controllerData.m_controllerStatus = 0;
 	lastTime = millis();
+}
+
+void speedControl() {
+	lastPosition = controllerData.position;
+
+	// IN-params:
+	//   controllerData.speed
+	//   setSpeedValue
+	// OUT-param:
+	//   speedOutput
+	speedController.Compute();
+
+	outVal = setSpeedValue / 8.0;
+//	if( outVal < -5 )
+//		outVal -= 32;
+//	else if( outVal > 5 )
+//		outVal += 32;
+//	else
+//		outVal = 0.0;
+	outVal += speedOutput;
+	outVal = constrain(outVal, -255, 255);
+	setMotorPwm(outVal);
 }
 
 // =========================================================================================
@@ -348,44 +371,10 @@ void loop()
 
 		calcSpeed(timeChange);
 
-		double outVal = 0.0;
-		lastPosition = controllerData.position;
-
-		if( controllerData.isRunning() ) {
-			// IN-params:
-			//   controllerData.speed
-			//   setSpeedValue
-			// OUT-param:
-			//   speedOutput
-			speedController.Compute();
-
-			outVal = setSpeedValue / 8.0;
-			if( outVal < -5 )
-				outVal -= 32;
-			else if( outVal > 5 )
-				outVal += 32;
-			else
-				outVal = 0.0;
-			outVal += speedOutput;
-			outVal = constrain(outVal, -255, 255);
-			setMotorPwm(outVal);
-
-			if( dumpValuesSerial ) {
-				Serial.print(controllerData.speed);
-				Serial.print("  O:");
-				Serial.print(speedOutput);
-				Serial.print("  Ov");
-				Serial.print(outVal);
-				Serial.print("  Set:");
-				Serial.print(setSpeedValue);
-				Serial.print("  LSM:");
-				Serial.print(lowSpeedMode);
-				Serial.println();
-			}
-		} else if ( controllerData.isMoving() ) {
+		if ( controllerData.isMoving() ) {
 			posController.Compute();
 
-			if( abs(setPosition-controllerData.position) < 10 && abs(controllerData.speed) < 100.0 ) {
+			if( abs(setPosition-controllerData.position) < 2 && abs(controllerData.speed) < 10.0 ) {
 				posOutput = 0;
 				controllerData.clearFlag(STATUS_MOVING);
 				if( dumpValuesSerial ) {
@@ -393,16 +382,22 @@ void loop()
 					Serial.println(controllerData.position, 0);
 				}
 			}
-			setMotorPwm(posOutput);
+			// setMotorPwm(posOutput);
+			setSpeedValue = posOutput;
+			speedControl();
 
 			if( dumpValuesSerial ) {
 				Serial.print(controllerData.position, 0);
-				Serial.print("\tsetP: ");
-				Serial.print(setPosition);
-				Serial.print("\tO:");
-				Serial.print(posOutput);
-				Serial.print("\tS:");
-				Serial.print(controllerData.speed, 0);
+				Serial.print("\t v: ");
+				Serial.print(controllerData.speed, 3);
+				Serial.print("\t posOut:");
+				Serial.print(posOutput, 2);
+				Serial.print("\t speedOut:");
+				Serial.print(speedOutput, 2);
+				Serial.print("\t PWM:");
+				Serial.print(outVal, 0);
+				Serial.print("\t LSM:");
+				Serial.print(lowSpeedMode);
 				Serial.println();
 			}
 		} else
