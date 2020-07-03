@@ -127,7 +127,7 @@ void setSpeedTunings( double kp, double ki, double kd ) {
 	Serial.println(kd, 3);
 }
 
-void setMaxOutput(double maxOut) {
+void setMaxSpeed(double maxOut) {
 	maxOutput = constrain(maxOut, 50.0, 1400.0);
 	Serial.print("set max output: ");
 	Serial.println(maxOutput);
@@ -201,9 +201,14 @@ void twiReceive(int numBytes) {
 	case TWI_CMD_MOVE_TO:
 		moveToPos( *((int32_t*)&twiBuffer[1]) );
 		break;
+	case TWI_CMD_MOVE_BY:
+		moveToPos( *((int32_t*)&twiBuffer[1]) + controllerData.position );
+		break;
 	case TWI_CMD_HOME:
 		home();
 		break;
+	case TWI_CMD_SETSPEED:
+		setMaxSpeed( *((int16_t*)&twiBuffer[1]) );
 	default:
 		Serial.println("unknown TWI command!");
 	}
@@ -226,7 +231,7 @@ void serialReceive() {
 			} else if( strncmp(serialReceiveBuffer, "dumpon", 7) == 0 ) {
 				dumpValuesSerial = true;
 			} else if( strncmp(serialReceiveBuffer, "maxout", 6) == 0 ) {
-				setMaxOutput(atof(serialReceiveBuffer+6));
+				setMaxSpeed(atof(serialReceiveBuffer+6));
 			} else if( strcmp(serialReceiveBuffer, "state") == 0 ) {
 				dumpState();
 			} else if( strcmp(serialReceiveBuffer, "stop") == 0 ) {

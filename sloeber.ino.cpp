@@ -2,7 +2,7 @@
 //This is a automatic generated file
 //Please do not modify this file
 //If you touch this file your change will be overwritten during the next build
-//This file has been generated on 2020-07-02 14:30:38
+//This file has been generated on 2020-07-03 12:06:43
 
 #include "Arduino.h"
 #include "Arduino.h"
@@ -17,7 +17,7 @@ void stop() ;
 void home() ;
 void setPosTunings( double kp, double ki, double kd ) ;
 void setSpeedTunings( double kp, double ki, double kd ) ;
-void setMaxOutput(double maxOut) ;
+void setMaxSpeed(double maxOut) ;
 void runAtSpeed(double speed) ;
 void moveToPos(int pos) ;
 void dumpState() ;

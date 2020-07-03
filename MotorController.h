@@ -8,7 +8,7 @@
 #ifndef MOTORCONTROLLER_H_
 #define MOTORCONTROLLER_H_
 
-#include <sys/types.h>
+#include <inttypes.h>
 
 
 #define MOTORCONTROLLER_TWI_ADDRESS 0x6D
@@ -31,19 +31,25 @@
 #define TWI_CMD_MOVE_TO 2
 
 /** Command: HOME: start homing
- *  Params: none
+ *  Param: none
  */
 #define TWI_CMD_HOME 3
 
 /** Command: MOVE: move relative by given offset
- *  Params: offset (int32)
+ *  Param: offset (int32)
  */
 #define TWI_CMD_MOVE_BY 5
 
 /** Command: RUN: start motor with given speed
- *  Params: speed (int16): positiv values: right, negative values: left
+ *  Param: speed (int16): positive values: right, negative values: left
  */
 #define TWI_CMD_RUN 6
+
+/** Command: SETSPEED: set max speed for homing and moving
+ *  Param: speed (int16): positive values: right, negative values: left
+ */
+#define TWI_CMD_SETSPEED 7
+
 
 /** Process data, will be transmitted to I2C master */
 class ControllerData {
