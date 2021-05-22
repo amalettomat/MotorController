@@ -4,6 +4,7 @@
 #include "MotorController.h"
 #include "string.h"
 
+#define SERIAL_DEBUG false
 
 #define PIN_MOT_LEFT 7
 #define PIN_MOT_RIGHT 8
@@ -94,15 +95,27 @@ void stop() {
 	controllerData.clearFlag(STATUS_RUNNING);
 	controllerData.clearFlag(STATUS_MOVING);
 	controllerData.clearFlag(STATUS_HOMING);
-	Serial.println("STOP");
+	if( SERIAL_DEBUG )
+		Serial.println("STOP");
 }
 
-void home() {
-	Serial.println("start homing");
+void home( int16_t speed ) {
+	if( SERIAL_DEBUG ) {
+		Serial.print("start homing at speed: ");
+		Serial.println(speed);
+	}
 	controllerData.setFlag(STATUS_MOVING);
 	controllerData.setFlag(STATUS_RUNNING);
 	controllerData.setFlag(STATUS_HOMING);
-	setPosition = -2400.0;
+
+	setMaxSpeed(speed);
+
+	controllerData.position = 0;
+
+	if( speed > 0 )
+		setPosition = 2400.0;
+	else
+		setPosition = -2400.0;
 }
 
 void setPosTunings( double kp, double ki, double kd ) {
@@ -110,10 +123,13 @@ void setPosTunings( double kp, double ki, double kd ) {
 	ki_pos = ki;
 	kd_pos = kd;
 	posController.SetTunings(kp_pos, ki_pos, kd_pos);
-	Serial.print("pos PID params: ");
-	Serial.print(kp, 3); Serial.print(", ");
-	Serial.print(ki, 3); Serial.print(", ");
-	Serial.println(kd, 3);
+
+	if( SERIAL_DEBUG ) {
+		Serial.print("pos PID params: ");
+		Serial.print(kp, 3); Serial.print(", ");
+		Serial.print(ki, 3); Serial.print(", ");
+		Serial.println(kd, 3);
+	}
 }
 
 void setSpeedTunings( double kp, double ki, double kd ) {
@@ -121,23 +137,30 @@ void setSpeedTunings( double kp, double ki, double kd ) {
 	ki_speed = ki;
 	kd_speed = kd;
 	speedController.SetTunings(kp_speed, ki_speed, kd_speed);
-	Serial.print("speed PID params: ");
-	Serial.print(kp, 3); Serial.print(", ");
-	Serial.print(ki, 3); Serial.print(", ");
-	Serial.println(kd, 3);
+
+	if( SERIAL_DEBUG ) {
+		Serial.print("speed PID params: ");
+		Serial.print(kp, 3); Serial.print(", ");
+		Serial.print(ki, 3); Serial.print(", ");
+		Serial.println(kd, 3);
+	}
 }
 
 void setMaxSpeed(double maxOut) {
 	maxOutput = constrain(maxOut, 50.0, 1400.0);
-	Serial.print("set max output: ");
-	Serial.println(maxOutput);
+	if( SERIAL_DEBUG ) {
+		Serial.print("set max output: ");
+		Serial.println(maxOutput);
+	}
 	posController.SetOutputLimits(-maxOutput, maxOutput);
 }
 
 void runAtSpeed(double speed) {
 	setSpeedValue = speed;
-	Serial.print("run at speed: ");
-	Serial.println(setSpeedValue);
+	if( SERIAL_DEBUG ) {
+		Serial.print("run at speed: ");
+		Serial.println(setSpeedValue);
+	}
 	controllerData.setFlag(STATUS_RUNNING);
 	controllerData.clearFlag(STATUS_MOVING);
 	controllerData.clearFlag(STATUS_HOMING);
@@ -145,12 +168,17 @@ void runAtSpeed(double speed) {
 
 void moveToPos(int pos) {
 	if( !homed ) {
-		Serial.println("not homed!");
+		if( SERIAL_DEBUG )
+			Serial.println("not homed!");
 		return;
 	}
 	setPosition = pos;
-	Serial.print("move to pos: ");
-	Serial.println(setPosition);
+
+	if( SERIAL_DEBUG ) {
+		Serial.print("move to pos: ");
+		Serial.println(setPosition);
+	}
+
 	controllerData.setFlag(STATUS_MOVING);
 	controllerData.clearFlag(STATUS_RUNNING);
 	controllerData.clearFlag(STATUS_HOMING);
@@ -170,25 +198,31 @@ void dumpState() {
 void twiRequest() {
 	// return controller data
 	Wire.write((uint8_t*)&controllerData, sizeof(controllerData));
-	Serial.print("### TWI data requested: "); Serial.println(sizeof(controllerData));
+	// Serial.print("### TWI data requested: "); Serial.println(sizeof(controllerData));
 }
 
 void twiReceive(int numBytes) {
-	Serial.print("twiReceive: ");
+	if( SERIAL_DEBUG )
+		Serial.print("twiReceive: ");
 
 	int index = 0;
 	while( index < TWI_BUFFER_SIZE && Wire.available() ) {
 		twiBuffer[index] = Wire.read();
-		Serial.print(twiBuffer[index]);
-		Serial.print(" ");
+
+		if( SERIAL_DEBUG ) {
+			Serial.print(twiBuffer[index]);
+			Serial.print(" ");
+		}
 		index++;
 	}
 
 	if( index < 1 ) {
-		Serial.println(" ERROR: received 0 bytes");
+		if( SERIAL_DEBUG )
+			Serial.println(" ERROR: received 0 bytes");
 		return;
 	}
-	Serial.println();
+	if( SERIAL_DEBUG )
+		Serial.println();
 
 	// parse commands
 	switch(twiBuffer[0]) {
@@ -205,12 +239,14 @@ void twiReceive(int numBytes) {
 		moveToPos( *((int32_t*)&twiBuffer[1]) + controllerData.position );
 		break;
 	case TWI_CMD_HOME:
-		home();
+		home( *((int16_t*)&twiBuffer[1]) );
 		break;
 	case TWI_CMD_SETSPEED:
 		setMaxSpeed( *((int16_t*)&twiBuffer[1]) );
+		break;
 	default:
-		Serial.println("unknown TWI command!");
+		if( SERIAL_DEBUG )
+			Serial.println("unknown TWI command!");
 	}
 
 }
@@ -249,7 +285,7 @@ void serialReceive() {
 			} else if( strncmp(serialReceiveBuffer, "dp", 2) == 0 ) {
 				setPosTunings( kp_pos, ki_pos, atof(serialReceiveBuffer+2));
 			} else if( strncmp(serialReceiveBuffer, "hm", 2) == 0 ) {
-				home();
+				home(150);
 			} else if( strncmp(serialReceiveBuffer, "hs", 2) == 0 ) {
 				homingSpeed = atof(serialReceiveBuffer+2);
 			} else if( strncmp(serialReceiveBuffer, "m", 1) == 0 ) {
@@ -295,8 +331,10 @@ void calcSpeed(unsigned long timeChange) {
 
 void setup()
 {
-	Serial.begin(38400);
-	Serial.println("Motor Controller V1 " __DATE__ " " __TIME__);
+	if( SERIAL_DEBUG ) {
+		Serial.begin(38400);
+		Serial.println("Motor Controller V1 " __DATE__ " " __TIME__);
+	}
 
 	Wire.begin(MOTORCONTROLLER_TWI_ADDRESS);
 	Wire.onRequest(twiRequest);
@@ -355,7 +393,8 @@ void speedControl() {
 
 void loop()
 {
-	serialReceive();
+	if( SERIAL_DEBUG )
+		serialReceive();
 
 	if( controllerData.isHoming() ) {
 		if( !digitalRead(PIN_ENDSWITCH) ) { // LOW: end switch reached
@@ -364,6 +403,7 @@ void loop()
 			setMotorPwm(0.0);
 			controllerData.position = 0;
 			homed = true;
+
 		}
 	}
 
