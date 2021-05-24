@@ -4,7 +4,7 @@
 #include "MotorController.h"
 #include "string.h"
 
-#define SERIAL_DEBUG false
+#define SERIAL_DEBUG true
 
 #define PIN_MOT_LEFT 7
 #define PIN_MOT_RIGHT 8
@@ -41,7 +41,7 @@ double kp_pos = 4.0;
 double ki_pos = 0.0;
 double kd_pos = 0.1;
 
-// homing
+// homing TODO: use homingSpeed instead of cur max speed
 double homingSpeed = -500.0;
 
 struct ControllerData controllerData;
@@ -112,6 +112,7 @@ void home( int16_t speed ) {
 
 	controllerData.position = 0;
 
+	// TODO make max homing distance configurable
 	if( speed > 0 )
 		setPosition = 2400.0;
 	else
